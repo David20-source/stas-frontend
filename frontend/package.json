@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
     "axios": "^1.14.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.38.0",
+    "jsonwebtoken": "^9.0.3",
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0",
     "lucide-react": "^1.7.0",
@@ -21,6 +23,7 @@
     "react-router-dom": "^7.13.2",
     "react-toastify": "^11.0.5",
     "socket.io-client": "^4.8.3",
+    "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
