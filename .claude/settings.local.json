@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const l = require\\('./node_modules/lucide-react/dist/cjs/lucide-react.js'\\); ['RouteIcon','BarChart2','Construction','TrafficCone','Car','Droplets','Star','ChartLine','TrendingUp','Navigation'].forEach\\(n => console.log\\(n, ':', typeof l[n]\\)\\)\")",
+      "Bash(npx vite:*)",
+      "Bash(node -e ':*)",
+      "Bash(npm run:*)",
+      "WebFetch(domain:data.humdata.org)",
+      "WebFetch(domain:export.hotosm.org)"
+    ]
+  }
+}
