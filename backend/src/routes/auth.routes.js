@@ -86,16 +86,49 @@ authRouter.post('/login', async (req, res, next) => {
       const { data, error } = await supabaseAdmin.auth.signInWithPassword({ email, password })
       if (error) return res.status(401).json({ error: 'Invalid email or password' })
 
-      const meta  = data.user.user_metadata || {}
-      const token = _signToken({ id: data.user.id, email: data.user.email, role: meta.role || 'CITIZEN', full_name: meta.full_name || '' })
+      // ✅ Query public.users for the role
+      const { data: userData, error: userError } = await supabaseAdmin
+        .from('users')
+        .select('id, email, full_name, role, phone, is_verified')
+        .eq('email', email)
+        .single()
+
+      let role = 'CITIZEN'
+      let full_name = ''
+
+      if (userData) {
+        role = userData.role || 'CITIZEN'
+        full_name = userData.full_name || ''
+      } else {
+        // Fallback: use metadata from auth
+        const meta = data.user.user_metadata || {}
+        role = meta.role || 'CITIZEN'
+        full_name = meta.full_name || ''
+      }
+
+      const token = _signToken({
+        id: data.user.id,
+        email: data.user.email,
+        role: role,
+        full_name: full_name
+      })
 
       // Update last_login
-      await supabaseAdmin.from('users').update({ last_login: new Date().toISOString() }).eq('id', data.user.id)
+      await supabaseAdmin.from('users').update({
+        last_login: new Date().toISOString()
+      }).eq('id', data.user.id)
 
       return res.json({
-        access_token: token, token_type: 'bearer', expires_in: JWT_EXPIRES,
+        access_token: token,
+        token_type: 'bearer',
+        expires_in: JWT_EXPIRES,
         refresh_token: data.session?.refresh_token,
-        user: { id: data.user.id, email: data.user.email, role: meta.role || 'CITIZEN', full_name: meta.full_name },
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          role: role,
+          full_name: full_name
+        },
       })
     }
 
@@ -104,8 +137,15 @@ authRouter.post('/login', async (req, res, next) => {
     if (!user) return res.status(401).json({ error: 'Invalid email or password' })
 
     return res.json({
-      access_token: _signToken(user), token_type: 'bearer', expires_in: JWT_EXPIRES,
-      user: { id: user.id, email: user.email, role: user.role, full_name: user.full_name },
+      access_token: _signToken(user),
+      token_type: 'bearer',
+      expires_in: JWT_EXPIRES,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        full_name: user.full_name
+      },
       _dev: 'Dev accounts: admin@stas.local/admin123 | officer@stas.local/officer123 | citizen@stas.local/citizen123',
     })
   } catch (err) { next(err) }
