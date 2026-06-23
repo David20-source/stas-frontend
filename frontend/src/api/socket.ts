@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5000'
+// ✅ Now pointing to Railway backend
+const API_BASE = 'https://stas-backend-production.up.railway.app'
 
 let socket: Socket | null = null
 

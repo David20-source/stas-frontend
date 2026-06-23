@@ -1,10 +1,10 @@
 import axios from 'axios'
 
-// Hardcoded to use Vercel serverless API
-const API_BASE = '/api'
+// ✅ Now pointing to Railway backend
+const API_BASE = 'https://stas-backend-production.up.railway.app'
 
 export const api = axios.create({
-  baseURL: API_BASE,
+  baseURL: `${API_BASE}/api`,
   timeout: 10_000,
   headers: { 'Content-Type': 'application/json' },
 })
