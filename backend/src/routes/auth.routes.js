@@ -1,3 +1,4 @@
+```js
 'use strict'
 const express = require('express')
 const jwt     = require('jsonwebtoken')
@@ -45,6 +46,7 @@ authRouter.post('/register', async (req, res, next) => {
         email_confirm: true,
         user_metadata: { full_name: body.full_name, role: 'CITIZEN' },
       })
+
       if (error) {
         const status = error.message?.includes('already registered') ? 409 : 400
         return res.status(status).json({ error: error.message })
@@ -52,14 +54,29 @@ authRouter.post('/register', async (req, res, next) => {
 
       // Mirror into public.users for app queries
       await supabaseAdmin.from('users').upsert({
-        id: data.user.id, email: body.email,
-        full_name: body.full_name, role: 'CITIZEN', phone: body.phone || null,
+        id: data.user.id,
+        email: body.email,
+        full_name: body.full_name,
+        role: 'CITIZEN',
+        phone: body.phone || null,
       })
 
-      const token = _signToken({ id: data.user.id, email: body.email, role: 'CITIZEN', full_name: body.full_name })
+      const token = _signToken({
+        id: data.user.id,
+        email: body.email,
+        role: 'CITIZEN',
+        full_name: body.full_name,
+      })
+
       return res.status(201).json({
-        access_token: token, token_type: 'bearer',
-        user: { id: data.user.id, email: body.email, role: 'CITIZEN', full_name: body.full_name },
+        access_token: token,
+        token_type: 'bearer',
+        user: {
+          id: data.user.id,
+          email: body.email,
+          role: 'CITIZEN',
+          full_name: body.full_name,
+        },
       })
     }
 
@@ -67,14 +84,30 @@ authRouter.post('/register', async (req, res, next) => {
     if (devUsers.find((u) => u.email === body.email))
       return res.status(409).json({ error: 'Email already registered' })
 
-    const newUser = { id: crypto.randomUUID(), email: body.email, password_hash: _hash(body.password), full_name: body.full_name, role: 'CITIZEN' }
+    const newUser = {
+      id: crypto.randomUUID(),
+      email: body.email,
+      password_hash: _hash(body.password),
+      full_name: body.full_name,
+      role: 'CITIZEN',
+    }
+
     devUsers.push(newUser)
+
     return res.status(201).json({
-      access_token: _signToken(newUser), token_type: 'bearer',
-      user: { id: newUser.id, email: newUser.email, role: newUser.role, full_name: newUser.full_name },
+      access_token: _signToken(newUser),
+      token_type: 'bearer',
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        full_name: newUser.full_name,
+      },
       _dev: 'Supabase not configured — stored in memory only',
     })
-  } catch (err) { next(err) }
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ── POST /api/auth/login ───────────────────────────────────────────
@@ -83,40 +116,33 @@ authRouter.post('/login', async (req, res, next) => {
     const { email, password } = LoginSchema.parse(req.body)
 
     if (isConfigured) {
-      const { data, error } = await supabaseAdmin.auth.signInWithPassword({ email, password })
-      if (error) return res.status(401).json({ error: 'Invalid email or password' })
+      const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      // ✅ Query public.users for the role
-      const { data: userData, error: userError } = await supabaseAdmin
+      if (error)
+        return res.status(401).json({ error: 'Invalid email or password' })
+
+      // Fetch latest user data from public.users table
+      const { data: dbUser } = await supabaseAdmin
         .from('users')
-        .select('id, email, full_name, role, phone, is_verified')
-        .eq('email', email)
+        .select('id, email, full_name, role')
+        .eq('id', data.user.id)
         .single()
-
-      let role = 'CITIZEN'
-      let full_name = ''
-
-      if (userData) {
-        role = userData.role || 'CITIZEN'
-        full_name = userData.full_name || ''
-      } else {
-        // Fallback: use metadata from auth
-        const meta = data.user.user_metadata || {}
-        role = meta.role || 'CITIZEN'
-        full_name = meta.full_name || ''
-      }
 
       const token = _signToken({
         id: data.user.id,
         email: data.user.email,
-        role: role,
-        full_name: full_name
+        role: dbUser?.role || 'CITIZEN',
+        full_name: dbUser?.full_name || '',
       })
 
       // Update last_login
-      await supabaseAdmin.from('users').update({
-        last_login: new Date().toISOString()
-      }).eq('id', data.user.id)
+      await supabaseAdmin
+        .from('users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', data.user.id)
 
       return res.json({
         access_token: token,
@@ -126,15 +152,19 @@ authRouter.post('/login', async (req, res, next) => {
         user: {
           id: data.user.id,
           email: data.user.email,
-          role: role,
-          full_name: full_name
+          role: dbUser?.role || 'CITIZEN',
+          full_name: dbUser?.full_name || '',
         },
       })
     }
 
     // Dev-mode
-    const user = devUsers.find((u) => u.email === email && u.password_hash === _hash(password))
-    if (!user) return res.status(401).json({ error: 'Invalid email or password' })
+    const user = devUsers.find(
+      (u) => u.email === email && u.password_hash === _hash(password)
+    )
+
+    if (!user)
+      return res.status(401).json({ error: 'Invalid email or password' })
 
     return res.json({
       access_token: _signToken(user),
@@ -144,33 +174,63 @@ authRouter.post('/login', async (req, res, next) => {
         id: user.id,
         email: user.email,
         role: user.role,
-        full_name: user.full_name
+        full_name: user.full_name,
       },
-      _dev: 'Dev accounts: admin@stas.local/admin123 | officer@stas.local/officer123 | citizen@stas.local/citizen123',
+      _dev:
+        'Dev accounts: admin@stas.local/admin123 | officer@stas.local/officer123 | citizen@stas.local/citizen123',
     })
-  } catch (err) { next(err) }
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ── POST /api/auth/refresh ─────────────────────────────────────────
 authRouter.post('/refresh', async (req, res, next) => {
   try {
-    const { refresh_token } = z.object({ refresh_token: z.string().min(1) }).parse(req.body)
+    const { refresh_token } = z
+      .object({ refresh_token: z.string().min(1) })
+      .parse(req.body)
 
-    if (!isConfigured) return res.status(501).json({ error: 'Token refresh requires Supabase' })
+    if (!isConfigured)
+      return res
+        .status(501)
+        .json({ error: 'Token refresh requires Supabase' })
 
-    const { data, error } = await supabaseAdmin.auth.refreshSession({ refresh_token })
-    if (error) return res.status(401).json({ error: 'Invalid or expired refresh token' })
+    const { data, error } = await supabaseAdmin.auth.refreshSession({
+      refresh_token,
+    })
 
-    const meta  = data.user.user_metadata || {}
-    const token = _signToken({ id: data.user.id, email: data.user.email, role: meta.role || 'CITIZEN', full_name: meta.full_name || '' })
-    res.json({ access_token: token, token_type: 'bearer', refresh_token: data.session?.refresh_token })
-  } catch (err) { next(err) }
+    if (error)
+      return res
+        .status(401)
+        .json({ error: 'Invalid or expired refresh token' })
+
+    // Fetch latest user data from public.users table
+    const { data: dbUser } = await supabaseAdmin
+      .from('users')
+      .select('id, email, full_name, role')
+      .eq('id', data.user.id)
+      .single()
+
+    const token = _signToken({
+      id: data.user.id,
+      email: data.user.email,
+      role: dbUser?.role || 'CITIZEN',
+      full_name: dbUser?.full_name || '',
+    })
+
+    res.json({
+      access_token: token,
+      token_type: 'bearer',
+      refresh_token: data.session?.refresh_token,
+    })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ── POST /api/auth/logout ──────────────────────────────────────────
 authRouter.post('/logout', requireAuth, (_req, res) => {
-  // JWT is stateless — client drops the token. Server-side session invalidation
-  // is handled by Supabase when the refresh token expires.
   res.json({ ok: true, message: 'Logged out successfully' })
 })
 
@@ -180,13 +240,20 @@ authRouter.get('/me', requireAuth, async (req, res, next) => {
     if (isConfigured) {
       const { data } = await supabaseAdmin
         .from('users')
-        .select('id, email, full_name, role, phone, is_verified, created_at, last_login')
+        .select(
+          'id, email, full_name, role, phone, is_verified, created_at, last_login'
+        )
         .eq('id', req.user.id)
         .single()
+
       if (data) return res.json(data)
     }
+
     res.json(req.user)
-  } catch (err) { next(err) }
+  } catch (err) {
+    next(err)
+  }
 })
 
 module.exports = { authRouter }
+```
